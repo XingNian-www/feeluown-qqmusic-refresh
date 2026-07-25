@@ -55,8 +55,9 @@ def check_cookie() -> dict[str, str]:
 
 
 class _CookieMenuController:
-    def __init__(self, app):
+    def __init__(self, app, provider_ui):
         self.app = app
+        self.provider_ui = provider_ui
         self.busy = False
 
     def add_items(self, menu) -> None:
@@ -67,6 +68,15 @@ class _CookieMenuController:
         check_action.triggered.connect(self.check_cookie)
         refresh_action = menu.addAction("强制更新 Cookie")
         refresh_action.triggered.connect(self.force_refresh)
+        login_action = menu.addAction("全新网页登录并获取刷新凭据")
+        login_action.triggered.connect(self.fresh_login)
+
+    def fresh_login(self) -> None:
+        relogin = getattr(self.provider_ui, "_re_login", None)
+        if relogin is None:
+            self._show_error("网页登录失败", "官方 QQ 音乐 provider 不支持重新登录")
+            return
+        relogin()
 
     def _show_error(self, title: str, message: str) -> None:
         QMessageBox = _message_box()
@@ -199,10 +209,11 @@ def install_qqmusic_ui(app, retries: int = 20) -> bool:
         logger.warning("QQ Music provider UI does not support context menus")
         return False
 
-    controller = _CookieMenuController(app)
+    controller = _CookieMenuController(app, provider_ui)
     from .login_capture import install_login_capture
 
-    install_login_capture(provider_ui)
+    if install_login_capture(provider_ui):
+        logger.info("QQ Music web login credential capture enabled")
 
     def context_menu_add_items(menu, original=original, controller=controller):
         original(menu)

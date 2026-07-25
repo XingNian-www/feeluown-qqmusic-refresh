@@ -199,6 +199,7 @@ class CredentialTests(unittest.TestCase):
                 "查看 Cookie 状态",
                 "检测 Cookie 可用性",
                 "强制更新 Cookie",
+                "全新网页登录并获取刷新凭据",
             ],
         )
         self.assertTrue(install_qqmusic_ui(app))
