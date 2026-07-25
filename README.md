@@ -51,6 +51,16 @@ config.qqmusic_refresh.RefreshKey = "..."
 
 它们位于 FeelUOwn 的数据目录中。插件不会把真实 cookie 写入仓库或日志。
 
+## QQ 音乐右键菜单
+
+重启 FeelUOwn 后，在侧边栏的 QQ 音乐提供方头像上点击右键，可以使用：
+
+- **查看 Cookie 状态**：查看本地 Cookie 文件、音乐密钥、自动监控和最近刷新结果。
+- **检测 Cookie 可用性**：使用当前 Cookie 请求 QQ 音乐用户接口，确认登录态是否有效。
+- **强制更新 Cookie**：立即调用移动端续期接口，写回新的 `qqmusic_key`，并同步当前 QQ 音乐 provider。
+
+右键菜单由本插件注入官方 QQ 音乐 provider UI，不需要修改 `fuo-qqmusic` 源码。更新插件后需要重启 FeelUOwn，才能让插件管理器重新加载入口。
+
 ## 手动诊断
 
 ```bash

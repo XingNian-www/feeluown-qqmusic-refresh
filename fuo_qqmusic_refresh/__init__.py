@@ -251,6 +251,10 @@ def enable(app):
         return
     _runner = _RefreshRunner(app)
     _runner.start()
+    if app.mode & app.GuiMode:
+        from .ui import install_qqmusic_ui
+
+        install_qqmusic_ui(app)
 
 
 def disable(app):
@@ -258,3 +262,7 @@ def disable(app):
     if _runner is not None:
         _runner.stop()
         _runner = None
+    if app.mode & app.GuiMode:
+        from .ui import uninstall_qqmusic_ui
+
+        uninstall_qqmusic_ui(app)

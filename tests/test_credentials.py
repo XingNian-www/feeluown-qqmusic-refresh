@@ -1,5 +1,7 @@
 import unittest
+import sys
 import tempfile
+import types
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -7,6 +9,25 @@ from unittest.mock import patch
 import fuo_qqmusic_refresh as plugin
 from fuo_qqmusic_refresh.credentials import credentials_from_sources
 from fuo_qqmusic_refresh.storage import save_json, update_cookie_document
+from fuo_qqmusic_refresh.ui import check_cookie, install_qqmusic_ui
+
+
+class _FakeAction:
+    def __init__(self, label):
+        self.label = label
+        self.triggered = SimpleNamespace(connect=lambda callback: None)
+
+
+class _FakeMenu:
+    def __init__(self):
+        self.labels = []
+
+    def addSeparator(self):
+        self.labels.append("separator")
+
+    def addAction(self, label):
+        self.labels.append(label)
+        return _FakeAction(label)
 
 
 class CredentialTests(unittest.TestCase):
@@ -85,3 +106,56 @@ class CredentialTests(unittest.TestCase):
             self.assertTrue(result["healthy"])
             self.assertTrue(result["has_music_key"])
             self.assertNotIn("secret", str(result))
+
+    def test_check_cookie_delegates_to_qqmusic_provider(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cookie_file = Path(temp_dir) / "cookies.json"
+            save_json(cookie_file, {"cookies": {"uin": "12345", "qqmusic_key": "key"}})
+            user = SimpleNamespace(name="tester", identifier="12345")
+            qq_provider = SimpleNamespace(
+                try_get_user_from_cookies=lambda cookies: (user, "")
+            )
+            qqmusic_package = types.ModuleType("fuo_qqmusic")
+            qqmusic_provider = types.ModuleType("fuo_qqmusic.provider")
+            qqmusic_provider.provider = qq_provider
+            qqmusic_package.provider = qqmusic_provider
+            config = SimpleNamespace(CookieFile=str(cookie_file))
+            with patch.dict(
+                sys.modules,
+                {
+                    "fuo_qqmusic": qqmusic_package,
+                    "fuo_qqmusic.provider": qqmusic_provider,
+                },
+            ), patch.object(plugin, "_config", config):
+                self.assertEqual(
+                    check_cookie(),
+                    {"name": "tester", "uin": "12345"},
+                )
+
+    def test_install_qqmusic_ui_adds_cookie_actions_once(self):
+        original_calls = []
+
+        def original(menu):
+            original_calls.append(True)
+
+        provider_ui = SimpleNamespace(
+            provider=SimpleNamespace(meta=SimpleNamespace(identifier="qqmusic")),
+            context_menu_add_items=original,
+        )
+        app = SimpleNamespace(
+            pvd_ui_mgr=SimpleNamespace(get=lambda identifier: provider_ui)
+        )
+        self.assertTrue(install_qqmusic_ui(app))
+        menu = _FakeMenu()
+        provider_ui.context_menu_add_items(menu)
+        self.assertEqual(original_calls, [True])
+        self.assertEqual(
+            menu.labels,
+            [
+                "separator",
+                "查看 Cookie 状态",
+                "检测 Cookie 可用性",
+                "强制更新 Cookie",
+            ],
+        )
+        self.assertTrue(install_qqmusic_ui(app))
