@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Runtime credentials and refresh state.
+fuo_qqmusic_refresh.json
+qqmusic-cookies.json
+qqmusic-device.json
+*.cookie
+*.cookies
+.env
+.env.*
