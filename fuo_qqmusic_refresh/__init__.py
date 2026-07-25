@@ -27,7 +27,7 @@ from .storage import (
 
 __alias__ = "QQ 音乐 Cookie 自动续期"
 __feeluown_version__ = "1.1.0"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __desc__ = "使用 QQ 音乐移动端登录接口自动续期现有 QQ 音乐登录态"
 __author__ = "Codex"
 
