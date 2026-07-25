@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 
 from .credentials import CredentialError
 from .storage import default_cookie_file, load_json
 
 logger = logging.getLogger(__name__)
+
+
+def _qt_class(module_suffix: str, class_name: str):
+    """Load the Qt binding already available in the FeelUOwn environment."""
+    errors = []
+    for binding in ("PyQt5", "PyQt6", "PySide6", "PySide2"):
+        try:
+            module = importlib.import_module(f"{binding}.{module_suffix}")
+        except ImportError as exc:
+            errors.append(exc)
+            continue
+        return getattr(module, class_name)
+    raise ImportError("No supported Qt binding is installed") from errors[-1]
+
+
+def _message_box():
+    return _qt_class("QtWidgets", "QMessageBox")
 
 
 def _message_parent(app):
@@ -51,13 +69,11 @@ class _CookieMenuController:
         refresh_action.triggered.connect(self.force_refresh)
 
     def _show_error(self, title: str, message: str) -> None:
-        from PyQt5.QtWidgets import QMessageBox
-
+        QMessageBox = _message_box()
         QMessageBox.warning(_message_parent(self.app), title, message)
 
     def _show_info(self, title: str, message: str) -> None:
-        from PyQt5.QtWidgets import QMessageBox
-
+        QMessageBox = _message_box()
         QMessageBox.information(_message_parent(self.app), title, message)
 
     def show_status(self) -> None:
@@ -153,8 +169,7 @@ def install_qqmusic_ui(app, retries: int = 20) -> bool:
     provider_ui = app.pvd_ui_mgr.get("qqmusic")
     if provider_ui is None:
         if retries > 0:
-            from PyQt5.QtCore import QTimer
-
+            QTimer = _qt_class("QtCore", "QTimer")
             QTimer.singleShot(100, lambda: install_qqmusic_ui(app, retries - 1))
         else:
             logger.warning("QQ Music provider UI was not available")
