@@ -37,6 +37,8 @@ config.qqmusic_refresh.IntervalHours = 24
 
 如果浏览器 cookie 没有 `psrf_qqopenid`、`psrf_qqaccess_token`、`psrf_qqrefresh_token` 或 `refresh_key`，可以把这些值放在配置中。更推荐先从 QQ 音乐登录请求中获取完整字段，不要把 cookie 提交给第三方接口。
 
+注意：`refresh_key` 不是由 `qqmusic_key` 本地计算出来的值。QQ 音乐移动端续期接口把 `refresh_token` 或 `refresh_key` 当作已有登录凭据；普通网页登录成功只代表 Cookie 可用，不保证会产生这两个字段。右键的“查看 Cookie 状态”会分别显示 `openid`、`access_token`、`refresh_token`、`refresh_key` 是否存在，不会显示值。
+
 ```python
 config.qqmusic_refresh.OpenID = "..."
 config.qqmusic_refresh.AccessToken = "..."
@@ -70,6 +72,8 @@ fuo exec "import fuo_qqmusic_refresh as p; p.refresh_now()"
 ```
 
 这会执行一次同步刷新，适合诊断网络或字段问题。QQ 音乐移动端接口和 QIMEI 服务都可能变化，续期失败时请查看 FeelUOwn 日志中的返回 code；日志不会输出 token 内容。
+
+其中 `refresh_ready` 为 `False` 时，当前网页登录 Cookie 可以检测，但不能走本插件的移动端续期流程；需要重新获取包含 `psrf_qqrefresh_token` 或 `refresh_key` 的登录响应字段。
 
 查看续期状态：
 

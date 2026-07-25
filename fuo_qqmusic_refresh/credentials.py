@@ -63,6 +63,55 @@ def validate_refresh_credentials(credentials: Credentials) -> None:
     )
 
 
+def credential_presence(
+    cookies: dict[str, Any],
+    state: dict[str, Any] | None = None,
+    overrides: dict[str, Any] | None = None,
+) -> dict[str, bool]:
+    """Return non-secret presence flags for the fields used by the refresh flow."""
+    state = state or {}
+    overrides = overrides or {}
+    uin = _uin(cookies, state)
+    music_key = _first_non_empty(
+        cookies.get("qqmusic_key"),
+        cookies.get("qm_keyst"),
+        state.get("token"),
+    )
+    open_id = _first_non_empty(
+        cookies.get("psrf_qqopenid"),
+        cookies.get("openid"),
+        state.get("open_id"),
+        overrides.get("open_id"),
+    )
+    access_token = _first_non_empty(
+        cookies.get("psrf_qqaccess_token"),
+        cookies.get("access_token"),
+        state.get("access_token"),
+        overrides.get("access_token"),
+    )
+    refresh_token = _first_non_empty(
+        cookies.get("psrf_qqrefresh_token"),
+        cookies.get("refresh_token"),
+        state.get("refresh_token"),
+        overrides.get("refresh_token"),
+    )
+    refresh_key = _first_non_empty(
+        cookies.get("psrf_qqrefresh_key"),
+        cookies.get("refresh_key"),
+        state.get("refresh_key"),
+        overrides.get("refresh_key"),
+    )
+    return {
+        "has_uin": bool(uin),
+        "has_music_key": bool(music_key),
+        "has_open_id": bool(open_id),
+        "has_access_token": bool(access_token),
+        "has_refresh_token": bool(refresh_token),
+        "has_refresh_key": bool(refresh_key),
+        "refresh_ready": bool(refresh_token or refresh_key),
+    }
+
+
 def credentials_from_sources(
     cookies: dict[str, Any],
     state: dict[str, Any] | None = None,

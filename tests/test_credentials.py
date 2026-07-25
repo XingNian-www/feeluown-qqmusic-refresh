@@ -9,6 +9,7 @@ from unittest.mock import patch
 import fuo_qqmusic_refresh as plugin
 from fuo_qqmusic_refresh.credentials import (
     CredentialError,
+    credential_presence,
     credentials_from_sources,
     validate_refresh_credentials,
 )
@@ -74,6 +75,27 @@ class CredentialTests(unittest.TestCase):
         with self.assertRaisesRegex(CredentialError, "refresh_token or refresh_key"):
             validate_refresh_credentials(credentials)
 
+    def test_credential_presence_never_contains_secret_values(self):
+        result = credential_presence(
+            {
+                "uin": "12345",
+                "qqmusic_key": "secret-key",
+                "psrf_qqrefresh_token": "secret-refresh-token",
+            }
+        )
+        self.assertEqual(
+            result,
+            {
+                "has_uin": True,
+                "has_music_key": True,
+                "has_open_id": False,
+                "has_access_token": False,
+                "has_refresh_token": True,
+                "has_refresh_key": False,
+                "refresh_ready": True,
+            },
+        )
+
     def test_response_updates_existing_cookie_aliases(self):
         document = {
             "identifier": "12345",
@@ -89,7 +111,17 @@ class CredentialTests(unittest.TestCase):
         )
         self.assertEqual(updated["cookies"]["qqmusic_key"], "new")
         self.assertEqual(updated["cookies"]["qm_keyst"], "new")
-        self.assertNotIn("psrf_qqopenid", updated["cookies"])
+        self.assertEqual(updated["cookies"]["psrf_qqopenid"], "new-openid")
+
+    def test_response_adds_refresh_fields_to_basic_browser_cookie(self):
+        updated = update_cookie_document(
+            {"cookies": {"uin": "12345", "qqmusic_key": "old"}},
+            {"refresh_token": "new-refresh-token", "refresh_key": "new-refresh-key"},
+        )
+        self.assertEqual(
+            updated["cookies"]["psrf_qqrefresh_token"], "new-refresh-token"
+        )
+        self.assertEqual(updated["cookies"]["psrf_qqrefresh_key"], "new-refresh-key")
 
     def test_status_reports_persisted_refresh_health_without_secrets(self):
         with tempfile.TemporaryDirectory() as temp_dir:

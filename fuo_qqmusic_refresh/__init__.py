@@ -11,6 +11,7 @@ from typing import Any
 
 from .credentials import (
     CredentialError,
+    credential_presence,
     credentials_from_sources,
     validate_refresh_credentials,
 )
@@ -206,6 +207,16 @@ def status() -> dict[str, Any]:
         "state_file": str(state_file),
         "cookie_file_exists": cookie_file.exists(),
         "has_music_key": bool(cookies.get("qqmusic_key") or cookies.get("qm_keyst")),
+        **credential_presence(
+            cookies,
+            state,
+            {
+                "open_id": _get_config_value("OpenID", ""),
+                "access_token": _get_config_value("AccessToken", ""),
+                "refresh_token": _get_config_value("RefreshToken", ""),
+                "refresh_key": _get_config_value("RefreshKey", ""),
+            },
+        ),
         "last_result": last_result,
         "last_attempt_at": refresh_status.get("last_attempt_at"),
         "last_finished_at": refresh_status.get("last_finished_at"),

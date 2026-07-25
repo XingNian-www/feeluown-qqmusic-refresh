@@ -82,9 +82,10 @@ def update_cookie_document(document: dict[str, Any], data: dict[str, Any]) -> di
         value = str(data.get(source) or "")
         if not value:
             continue
-        for target in targets:
-            if target in updated:
-                updated[target] = value
+        existing_targets = [target for target in targets if target in updated]
+        write_targets = existing_targets or [targets[0]]
+        for target in write_targets:
+            updated[target] = value
 
     if "uin" in updated and data.get("musicid"):
         updated["uin"] = str(data["musicid"])
