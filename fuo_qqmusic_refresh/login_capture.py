@@ -134,6 +134,7 @@ def build_capturing_login_dialog(base_class):
         def __init__(self, *args, **kwargs):
             self._capture_started_at = 0.0
             self._capture_timer = None
+            self._capture_finished = False
             self._exchange_task = None
             self._exchange_cookies: dict[str, str] = {}
             self._login_code_key = None
@@ -176,10 +177,15 @@ def build_capturing_login_dialog(base_class):
                 self._exchange_cookies.update(merged)
 
         def _on_web_login_succeed(self, cookies):
-            self._capture_started_at = time.monotonic()
+            if self._capture_finished or not hasattr(self, "_web_login"):
+                return
+            if self._capture_started_at == 0.0:
+                self._capture_started_at = time.monotonic()
             self._schedule_capture_finish()
 
         def _schedule_capture_finish(self):
+            if self._capture_finished or not hasattr(self, "_web_login"):
+                return
             QTimer = _qt_class("QtCore", "QTimer")
             elapsed = time.monotonic() - self._capture_started_at
             task_pending = (
@@ -193,6 +199,9 @@ def build_capturing_login_dialog(base_class):
             self._finish_web_login()
 
         def _finish_web_login(self):
+            if self._capture_finished or not hasattr(self, "_web_login"):
+                return
+            self._capture_finished = True
             cookies = dict(getattr(self._web_login, "saved_cookies", {}))
             cookies.update(self._exchange_cookies)
             self.cookies_text_edit.setText(json.dumps(cookies, indent=2))
