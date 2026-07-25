@@ -2,6 +2,7 @@ import unittest
 
 from fuo_qqmusic_refresh.credentials import Credentials
 from fuo_qqmusic_refresh.device import Device
+from fuo_qqmusic_refresh.login_capture import login_exchange_payload
 from fuo_qqmusic_refresh.protocol import (
     build_login_payload,
     compact_json,
@@ -37,6 +38,17 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(payload["req"]["method"], "Login")
         self.assertEqual(payload["req"]["param"]["refresh_key"], "key")
         self.assertEqual(payload["comm"]["qq"], "12345")
+
+    def test_web_login_exchange_payload_matches_qq_login(self):
+        payload = login_exchange_payload("1", "callback-code")
+        self.assertEqual(payload["req"]["module"], "QQConnectLogin.LoginServer")
+        self.assertEqual(payload["req"]["method"], "QQLogin")
+        self.assertEqual(payload["req"]["param"]["code"], "callback-code")
+
+    def test_web_login_exchange_payload_matches_wechat_login(self):
+        payload = login_exchange_payload("2", "callback-code")
+        self.assertEqual(payload["req"]["module"], "music.login.LoginServer")
+        self.assertEqual(payload["req"]["param"]["strAppid"], "wx48db31d50e334801")
 
 
 if __name__ == "__main__":

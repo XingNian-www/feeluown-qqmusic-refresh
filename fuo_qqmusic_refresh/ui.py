@@ -200,6 +200,9 @@ def install_qqmusic_ui(app, retries: int = 20) -> bool:
         return False
 
     controller = _CookieMenuController(app)
+    from .login_capture import install_login_capture
+
+    install_login_capture(provider_ui)
 
     def context_menu_add_items(menu, original=original, controller=controller):
         original(menu)
@@ -220,6 +223,9 @@ def uninstall_qqmusic_ui(app) -> None:
     )
     if original is not None:
         provider_ui.context_menu_add_items = original
+    from .login_capture import uninstall_login_capture
+
+    uninstall_login_capture(provider_ui)
     for name in (
         "_qqmusic_refresh_controller",
         "_qqmusic_refresh_original_context_menu_add_items",

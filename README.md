@@ -65,6 +65,8 @@ config.qqmusic_refresh.RefreshKey = "..."
 
 右键菜单由本插件注入官方 QQ 音乐 provider UI，不需要修改 `fuo-qqmusic` 源码。更新插件后需要重启 FeelUOwn，才能让插件管理器重新加载入口。
 
+全新网页登录时，插件会自动保留登录窗口一小段时间，收集登录后延迟写入的完整 Cookie；如果网页跳转包含 QQ 音乐登录回调 code，还会在本机交换登录响应，并合并 `psrf_qqrefresh_token` 或 `refresh_key`（如果 QQ 音乐服务器返回）。这些字段不会输出到日志，也不会发送到第三方服务。
+
 ## 手动诊断
 
 ```bash
