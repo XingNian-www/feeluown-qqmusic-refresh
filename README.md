@@ -4,16 +4,15 @@
 
 ## 安装
 
-当前仓库尚未发布到 PyPI。私有仓库推荐使用 GitHub CLI 下载，然后在 FeelUOwn 使用的同一个 Python 环境中安装：
+当前仓库尚未发布到 PyPI。可以直接从公开 GitHub 仓库安装。推荐先克隆，然后在 FeelUOwn 使用的同一个 Python 环境中安装：
 
 ```bash
-gh auth login
-gh repo clone XingNian-www/feeluown-qqmusic-refresh
+git clone https://github.com/XingNian-www/feeluown-qqmusic-refresh.git
 cd feeluown-qqmusic-refresh
 python -m pip install -e .
 ```
 
-如果已经配置了 Git 的 GitHub 凭据，也可以直接安装：
+也可以直接安装：
 
 ```bash
 python -m pip install "git+https://github.com/XingNian-www/feeluown-qqmusic-refresh.git"
