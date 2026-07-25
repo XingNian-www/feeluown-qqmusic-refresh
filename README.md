@@ -4,13 +4,22 @@
 
 ## 安装
 
-在 FeelUOwn 使用的同一个 Python 环境中运行：
+当前仓库尚未发布到 PyPI。私有仓库推荐使用 GitHub CLI 下载，然后在 FeelUOwn 使用的同一个 Python 环境中安装：
 
 ```bash
-pip install feeluown-qqmusic-refresh
+gh auth login
+gh repo clone XingNian-www/feeluown-qqmusic-refresh
+cd feeluown-qqmusic-refresh
+python -m pip install -e .
 ```
 
-它会通过 `fuo.plugins_v1` 自动发现。需要同时安装官方 QQ 音乐 provider：
+如果已经配置了 Git 的 GitHub 凭据，也可以直接安装：
+
+```bash
+python -m pip install "git+https://github.com/XingNian-www/feeluown-qqmusic-refresh.git"
+```
+
+插件会通过 `fuo.plugins_v1` 自动发现。需要同时安装官方 QQ 音乐 provider：
 
 ```bash
 pip install fuo-qqmusic
