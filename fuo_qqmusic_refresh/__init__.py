@@ -9,7 +9,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .credentials import CredentialError, credentials_from_sources
+from .credentials import (
+    CredentialError,
+    credentials_from_sources,
+    validate_refresh_credentials,
+)
 from .protocol import refresh_login
 from .storage import (
     default_cookie_file,
@@ -119,6 +123,7 @@ def _refresh_once() -> bool:
             "refresh_key": _get_config_value("RefreshKey", ""),
         }
         credentials = credentials_from_sources(cookies, state, overrides)
+        validate_refresh_credentials(credentials)
         logger.info("Refreshing QQ Music login for uin=%s", credentials.uin)
 
         data = refresh_login(

@@ -59,6 +59,8 @@ config.qqmusic_refresh.RefreshKey = "..."
 - **检测 Cookie 可用性**：使用当前 Cookie 请求 QQ 音乐用户接口，确认登录态是否有效。
 - **强制更新 Cookie**：立即调用移动端续期接口，写回新的 `qqmusic_key`，并同步当前 QQ 音乐 provider。
 
+强制更新至少需要 Cookie 或配置中的 `refresh_token` / `refresh_key` 之一。只有 `uin` 和 `qqmusic_key` 的 Cookie 仍可做有效性检测，但不能执行续期。
+
 右键菜单由本插件注入官方 QQ 音乐 provider UI，不需要修改 `fuo-qqmusic` 源码。更新插件后需要重启 FeelUOwn，才能让插件管理器重新加载入口。
 
 ## 手动诊断

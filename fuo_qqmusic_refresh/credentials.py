@@ -53,6 +53,16 @@ class Credentials:
         }
 
 
+def validate_refresh_credentials(credentials: Credentials) -> None:
+    """Reject cookies that can be checked but do not contain a refresh credential."""
+    if credentials.refresh_token or credentials.refresh_key:
+        return
+    raise CredentialError(
+        "missing QQ Music refresh credential: refresh_token or refresh_key; "
+        "the current Cookie can be checked but cannot be force-refreshed"
+    )
+
+
 def credentials_from_sources(
     cookies: dict[str, Any],
     state: dict[str, Any] | None = None,

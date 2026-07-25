@@ -7,7 +7,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import fuo_qqmusic_refresh as plugin
-from fuo_qqmusic_refresh.credentials import credentials_from_sources
+from fuo_qqmusic_refresh.credentials import (
+    CredentialError,
+    credentials_from_sources,
+    validate_refresh_credentials,
+)
 from fuo_qqmusic_refresh.storage import save_json, update_cookie_document
 from fuo_qqmusic_refresh.ui import check_cookie, install_qqmusic_ui
 
@@ -62,6 +66,13 @@ class CredentialTests(unittest.TestCase):
             {"refresh_key": "old-config-key"},
         )
         self.assertEqual(credentials.refresh_key, "new-state-key")
+
+    def test_refresh_requires_a_refresh_credential(self):
+        credentials = credentials_from_sources(
+            {"uin": "12345", "qqmusic_key": "token"}
+        )
+        with self.assertRaisesRegex(CredentialError, "refresh_token or refresh_key"):
+            validate_refresh_credentials(credentials)
 
     def test_response_updates_existing_cookie_aliases(self):
         document = {
