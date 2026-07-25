@@ -76,6 +76,11 @@ class _CookieMenuController:
         QMessageBox = _message_box()
         QMessageBox.information(_message_parent(self.app), title, message)
 
+    def _defer_dialog(self, method, title: str, message: str) -> None:
+        """Show a modal dialog after the current qasync task has returned."""
+        QTimer = _qt_class("QtCore", "QTimer")
+        QTimer.singleShot(0, lambda: method(title, message))
+
     def show_status(self) -> None:
         from . import status
 
@@ -122,9 +127,14 @@ class _CookieMenuController:
         try:
             user = await run_fn(check_cookie)
         except Exception as exc:
-            self._show_error("Cookie 检测失败", f"当前 Cookie 不可用：{exc}")
+            self._defer_dialog(
+                self._show_error,
+                "Cookie 检测失败",
+                f"当前 Cookie 不可用：{exc}",
+            )
         else:
-            self._show_info(
+            self._defer_dialog(
+                self._show_info,
                 "Cookie 检测成功",
                 f"当前 Cookie 可用\n用户：{user['name']}\nUIN：{user['uin']}",
             )
@@ -148,9 +158,10 @@ class _CookieMenuController:
             await run_fn(refresh_now)
             info = status()
         except Exception as exc:
-            self._show_error("Cookie 更新失败", str(exc))
+            self._defer_dialog(self._show_error, "Cookie 更新失败", str(exc))
         else:
-            self._show_info(
+            self._defer_dialog(
+                self._show_info,
                 "Cookie 更新成功",
                 "\n".join(
                     (
