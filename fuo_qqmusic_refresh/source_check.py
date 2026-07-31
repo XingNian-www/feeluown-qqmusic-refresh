@@ -59,6 +59,15 @@ def _set_song_source_state(song: Any, available: bool) -> None:
         logger.debug("Unable to update QQ Music song media flags", exc_info=True)
 
 
+def _hide_unavailable_search_results() -> bool:
+    try:
+        from . import hide_unavailable_search_results
+
+        return hide_unavailable_search_results()
+    except Exception:
+        return True
+
+
 def _cached_source(provider: Any, song: Any) -> bool | None:
     uin, token = _api_cache_identity(provider)
     identifier = str(getattr(song, "identifier", "") or "")
@@ -120,18 +129,29 @@ def check_song_source(provider: Any, song: Any) -> bool | None:
 
 
 def precheck_search_result(result: Any, provider: Any) -> Any:
-    """Probe only the first five song results and keep the result shape intact."""
+    """Probe the first five results and optionally hide unavailable songs."""
     songs = getattr(result, "songs", None)
     if not songs:
         return result
 
-    for song in list(songs)[:SEARCH_SOURCE_CHECK_LIMIT]:
-        available = check_song_source(provider, song)
-        if available is False:
+    hide_unavailable = _hide_unavailable_search_results()
+    visible_songs = []
+    for index, song in enumerate(list(songs)):
+        available = True
+        if index < SEARCH_SOURCE_CHECK_LIMIT:
+            available = check_song_source(provider, song)
+        if available is False and hide_unavailable:
             logger.info(
                 "QQ Music search result has no playable source: %s",
                 getattr(song, "identifier", ""),
             )
+            continue
+        visible_songs.append(song)
+
+    try:
+        result.songs = visible_songs
+    except Exception:
+        songs[:] = visible_songs
     return result
 
 

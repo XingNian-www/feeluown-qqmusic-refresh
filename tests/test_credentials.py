@@ -15,7 +15,11 @@ from fuo_qqmusic_refresh.credentials import (
 )
 from fuo_qqmusic_refresh.storage import save_json, update_cookie_document
 from fuo_qqmusic_refresh import source_check
-from fuo_qqmusic_refresh.ui import check_cookie, install_qqmusic_ui
+from fuo_qqmusic_refresh.ui import (
+    _CookieMenuController,
+    check_cookie,
+    install_qqmusic_ui,
+)
 
 
 class _FakeAction:
@@ -228,6 +232,7 @@ class CredentialTests(unittest.TestCase):
                 "检测 Cookie 可用性",
                 "强制更新 Cookie",
                 "全新网页登录并获取刷新凭据",
+                "隐藏无音源搜索结果",
             ],
         )
         self.assertTrue(install_qqmusic_ui(app))
@@ -249,6 +254,7 @@ class SourceCheckTests(unittest.TestCase):
         self.assertEqual(len(api.calls), 5)
         self.assertTrue(all(call[2] == "M500" for call in api.calls))
         self.assertEqual(songs[0]._cache["qqmusic_source_available"], False)
+        self.assertEqual([song.identifier for song in result.songs], ["5", "6"])
         self.assertNotIn("qqmusic_source_available", songs[5]._cache)
 
     def test_source_check_uses_cache(self):
@@ -260,6 +266,26 @@ class SourceCheckTests(unittest.TestCase):
         self.assertTrue(source_check.check_song_source(provider, song))
 
         self.assertEqual(len(api.calls), 1)
+
+    def test_config_can_keep_unavailable_search_results(self):
+        api = _FakeSourceApi(available=False)
+        provider = SimpleNamespace(api=api)
+        result = SimpleNamespace(songs=[_FakeSong(str(index)) for index in range(3)])
+        config = SimpleNamespace(HideUnavailableSearchResults=False)
+
+        with patch.object(plugin, "_config", config):
+            source_check.precheck_search_result(result, provider)
+
+        self.assertEqual([song.identifier for song in result.songs], ["0", "1", "2"])
+        self.assertEqual(len(api.calls), 3)
+
+    def test_gui_toggle_updates_hide_setting(self):
+        config = SimpleNamespace(HideUnavailableSearchResults=True)
+        controller = _CookieMenuController(SimpleNamespace(), SimpleNamespace())
+
+        with patch.object(plugin, "_config", config):
+            controller.toggle_hide_unavailable(False)
+            self.assertFalse(plugin.hide_unavailable_search_results())
 
     def test_search_wrapper_skips_non_song_search(self):
         api = _FakeSourceApi()

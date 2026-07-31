@@ -70,6 +70,19 @@ class _CookieMenuController:
         refresh_action.triggered.connect(self.force_refresh)
         login_action = menu.addAction("全新网页登录并获取刷新凭据")
         login_action.triggered.connect(self.fresh_login)
+        hide_action = menu.addAction("隐藏无音源搜索结果")
+        if hasattr(hide_action, "setCheckable"):
+            hide_action.setCheckable(True)
+        if hasattr(hide_action, "setChecked"):
+            from . import hide_unavailable_search_results
+
+            hide_action.setChecked(hide_unavailable_search_results())
+        hide_action.triggered.connect(self.toggle_hide_unavailable)
+
+    def toggle_hide_unavailable(self, checked: bool = True) -> None:
+        from . import set_hide_unavailable_search_results
+
+        set_hide_unavailable_search_results(bool(checked))
 
     def fresh_login(self) -> None:
         relogin = getattr(self.provider_ui, "_re_login", None)
