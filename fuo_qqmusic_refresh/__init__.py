@@ -27,7 +27,7 @@ from .storage import (
 
 __alias__ = "QQ 音乐 Cookie 自动续期"
 __feeluown_version__ = "1.1.0"
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 __desc__ = "使用 QQ 音乐移动端登录接口自动续期现有 QQ 音乐登录态"
 __author__ = "Codex"
 
@@ -267,6 +267,10 @@ def enable(app):
         return
     _runner = _RefreshRunner(app)
     _runner.start()
+    from .source_check import install_source_check
+
+    if install_source_check():
+        logger.info("QQ Music first-five low-quality source check enabled")
     if app.mode & app.GuiMode:
         from .ui import install_qqmusic_ui
 
@@ -275,6 +279,9 @@ def enable(app):
 
 def disable(app):
     global _runner
+    from .source_check import uninstall_source_check
+
+    uninstall_source_check()
     if _runner is not None:
         _runner.stop()
         _runner = None

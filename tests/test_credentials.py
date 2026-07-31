@@ -14,6 +14,7 @@ from fuo_qqmusic_refresh.credentials import (
     validate_refresh_credentials,
 )
 from fuo_qqmusic_refresh.storage import save_json, update_cookie_document
+from fuo_qqmusic_refresh import source_check
 from fuo_qqmusic_refresh.ui import check_cookie, install_qqmusic_ui
 
 
@@ -33,6 +34,33 @@ class _FakeMenu:
     def addAction(self, label):
         self.labels.append(label)
         return _FakeAction(label)
+
+
+class _FakeSong:
+    def __init__(self, identifier):
+        self.identifier = identifier
+        self.media_flags = "unknown"
+        self._cache = {"mid": f"mid-{identifier}", "media_id": f"media-{identifier}"}
+
+    def cache_get(self, key):
+        return self._cache.get(key), key in self._cache
+
+    def cache_set(self, key, value, ttl=None):
+        self._cache[key] = value
+
+
+class _FakeSourceApi:
+    def __init__(self, available=True):
+        self._uin = "12345"
+        self.available = available
+        self.calls = []
+
+    def get_token_from_cookies(self):
+        return 5381
+
+    def get_song_url_v2(self, mid, media_id, quality):
+        self.calls.append((mid, media_id, quality))
+        return "https://audio.example/song.mp3" if self.available else ""
 
 
 class CredentialTests(unittest.TestCase):
@@ -203,3 +231,55 @@ class CredentialTests(unittest.TestCase):
             ],
         )
         self.assertTrue(install_qqmusic_ui(app))
+
+
+class SourceCheckTests(unittest.TestCase):
+    def setUp(self):
+        with source_check._cache_lock:
+            source_check._cache.clear()
+
+    def test_checks_only_first_five_with_lowest_quality(self):
+        api = _FakeSourceApi(available=False)
+        provider = SimpleNamespace(api=api)
+        songs = [_FakeSong(str(index)) for index in range(7)]
+        result = SimpleNamespace(songs=songs)
+
+        source_check.precheck_search_result(result, provider)
+
+        self.assertEqual(len(api.calls), 5)
+        self.assertTrue(all(call[2] == "M500" for call in api.calls))
+        self.assertEqual(songs[0]._cache["qqmusic_source_available"], False)
+        self.assertNotIn("qqmusic_source_available", songs[5]._cache)
+
+    def test_source_check_uses_cache(self):
+        api = _FakeSourceApi()
+        provider = SimpleNamespace(api=api)
+        song = _FakeSong("1")
+
+        self.assertTrue(source_check.check_song_source(provider, song))
+        self.assertTrue(source_check.check_song_source(provider, song))
+
+        self.assertEqual(len(api.calls), 1)
+
+    def test_search_wrapper_skips_non_song_search(self):
+        api = _FakeSourceApi()
+        provider = SimpleNamespace(api=api)
+
+        def original_search(keyword, **kwargs):
+            return SimpleNamespace(songs=[_FakeSong("1")])
+
+        provider.search = original_search
+        qqmusic_package = types.ModuleType("fuo_qqmusic")
+        qqmusic_provider = types.ModuleType("fuo_qqmusic.provider")
+        qqmusic_provider.provider = provider
+        with patch.dict(
+            sys.modules,
+            {
+                "fuo_qqmusic": qqmusic_package,
+                "fuo_qqmusic.provider": qqmusic_provider,
+            },
+        ):
+            self.assertTrue(source_check.install_source_check())
+            provider.search("query", type_="album")
+            self.assertEqual(api.calls, [])
+            source_check.uninstall_source_check()
