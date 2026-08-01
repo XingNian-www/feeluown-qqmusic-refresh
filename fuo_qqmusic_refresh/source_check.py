@@ -129,29 +129,48 @@ def check_song_source(provider: Any, song: Any) -> bool | None:
 
 
 def precheck_search_result(result: Any, provider: Any) -> Any:
-    """Probe the first five results and optionally hide unavailable songs."""
+    """Probe enough results to keep five playable candidates when hiding."""
     songs = getattr(result, "songs", None)
     if not songs:
         return result
 
+    try:
+        from . import search_source_check_enabled
+
+        if not search_source_check_enabled():
+            return result
+    except Exception:
+        pass
+
+    songs = list(songs)
     hide_unavailable = _hide_unavailable_search_results()
+
+    if not hide_unavailable:
+        for song in songs[:SEARCH_SOURCE_CHECK_LIMIT]:
+            check_song_source(provider, song)
+        return result
+
     visible_songs = []
-    for index, song in enumerate(list(songs)):
-        available = True
-        if index < SEARCH_SOURCE_CHECK_LIMIT:
-            available = check_song_source(provider, song)
+    playable_count = 0
+    for song in songs:
+        if playable_count >= SEARCH_SOURCE_CHECK_LIMIT:
+            visible_songs.append(song)
+            continue
+
+        available = check_song_source(provider, song)
         if available is False and hide_unavailable:
             logger.info(
                 "QQ Music search result has no playable source: %s",
                 getattr(song, "identifier", ""),
             )
             continue
+        playable_count += 1
         visible_songs.append(song)
 
     try:
         result.songs = visible_songs
     except Exception:
-        songs[:] = visible_songs
+        result.songs[:] = visible_songs
     return result
 
 

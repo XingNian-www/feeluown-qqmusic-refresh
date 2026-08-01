@@ -54,9 +54,10 @@ class _FakeSong:
 
 
 class _FakeSourceApi:
-    def __init__(self, available=True):
+    def __init__(self, available=True, available_ids=None):
         self._uin = "12345"
         self.available = available
+        self.available_ids = set(available_ids or ())
         self.calls = []
 
     def get_token_from_cookies(self):
@@ -64,7 +65,9 @@ class _FakeSourceApi:
 
     def get_song_url_v2(self, mid, media_id, quality):
         self.calls.append((mid, media_id, quality))
-        return "https://audio.example/song.mp3" if self.available else ""
+        identifier = str(media_id).removeprefix("media-")
+        is_available = self.available or identifier in self.available_ids
+        return "https://audio.example/song.mp3" if is_available else ""
 
 
 class CredentialTests(unittest.TestCase):
@@ -233,6 +236,7 @@ class CredentialTests(unittest.TestCase):
                 "强制更新 Cookie",
                 "全新网页登录并获取刷新凭据",
                 "隐藏无音源搜索结果",
+                "启用音源检测",
             ],
         )
         self.assertTrue(install_qqmusic_ui(app))
@@ -243,19 +247,25 @@ class SourceCheckTests(unittest.TestCase):
         with source_check._cache_lock:
             source_check._cache.clear()
 
-    def test_checks_only_first_five_with_lowest_quality(self):
-        api = _FakeSourceApi(available=False)
+    def test_checks_supplemental_results_until_five_are_playable(self):
+        api = _FakeSourceApi(
+            available=False,
+            available_ids={"5", "6", "7", "8", "9"},
+        )
         provider = SimpleNamespace(api=api)
-        songs = [_FakeSong(str(index)) for index in range(7)]
+        songs = [_FakeSong(str(index)) for index in range(12)]
         result = SimpleNamespace(songs=songs)
 
         source_check.precheck_search_result(result, provider)
 
-        self.assertEqual(len(api.calls), 5)
+        self.assertEqual(len(api.calls), 10)
         self.assertTrue(all(call[2] == "M500" for call in api.calls))
         self.assertEqual(songs[0]._cache["qqmusic_source_available"], False)
-        self.assertEqual([song.identifier for song in result.songs], ["5", "6"])
-        self.assertNotIn("qqmusic_source_available", songs[5]._cache)
+        self.assertEqual(
+            [song.identifier for song in result.songs],
+            [str(index) for index in range(5, 12)],
+        )
+        self.assertNotIn("qqmusic_source_available", songs[10]._cache)
 
     def test_source_check_uses_cache(self):
         api = _FakeSourceApi()
@@ -286,6 +296,25 @@ class SourceCheckTests(unittest.TestCase):
         with patch.object(plugin, "_config", config):
             controller.toggle_hide_unavailable(False)
             self.assertFalse(plugin.hide_unavailable_search_results())
+
+    def test_config_can_disable_source_check(self):
+        api = _FakeSourceApi(available=False)
+        provider = SimpleNamespace(api=api)
+        result = SimpleNamespace(songs=[_FakeSong(str(index)) for index in range(5)])
+        config = SimpleNamespace(EnableSearchSourceCheck=False)
+
+        with patch.object(plugin, "_config", config):
+            source_check.precheck_search_result(result, provider)
+
+        self.assertEqual(api.calls, [])
+
+    def test_gui_toggle_updates_source_check_setting(self):
+        config = SimpleNamespace(EnableSearchSourceCheck=True)
+        controller = _CookieMenuController(SimpleNamespace(), SimpleNamespace())
+
+        with patch.object(plugin, "_config", config):
+            controller.toggle_source_check(False)
+            self.assertFalse(plugin.search_source_check_enabled())
 
     def test_search_wrapper_skips_non_song_search(self):
         api = _FakeSourceApi()

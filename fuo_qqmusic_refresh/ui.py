@@ -78,11 +78,24 @@ class _CookieMenuController:
 
             hide_action.setChecked(hide_unavailable_search_results())
         hide_action.triggered.connect(self.toggle_hide_unavailable)
+        check_source_action = menu.addAction("启用音源检测")
+        if hasattr(check_source_action, "setCheckable"):
+            check_source_action.setCheckable(True)
+        if hasattr(check_source_action, "setChecked"):
+            from . import search_source_check_enabled
+
+            check_source_action.setChecked(search_source_check_enabled())
+        check_source_action.triggered.connect(self.toggle_source_check)
 
     def toggle_hide_unavailable(self, checked: bool = True) -> None:
         from . import set_hide_unavailable_search_results
 
         set_hide_unavailable_search_results(bool(checked))
+
+    def toggle_source_check(self, checked: bool = True) -> None:
+        from . import set_search_source_check_enabled
+
+        set_search_source_check_enabled(bool(checked))
 
     def fresh_login(self) -> None:
         relogin = getattr(self.provider_ui, "_re_login", None)

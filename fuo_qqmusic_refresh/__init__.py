@@ -27,7 +27,7 @@ from .storage import (
 
 __alias__ = "QQ 音乐 Cookie 自动续期"
 __feeluown_version__ = "1.1.0"
-__version__ = "0.1.5"
+__version__ = "0.1.7"
 __desc__ = "使用 QQ 音乐移动端登录接口自动续期现有 QQ 音乐登录态"
 __author__ = "Codex"
 
@@ -53,6 +53,12 @@ def init_config(config):
         True,
         "Hide QQ Music search results without a playable source",
     )
+    config.deffield(
+        "EnableSearchSourceCheck",
+        bool,
+        True,
+        "Check QQ Music search results for a playable source",
+    )
     config.deffield("RefreshKey", str, "", "Optional refresh_key override")
     config.deffield("OpenID", str, "", "Optional openid override")
     config.deffield("AccessToken", str, "", "Optional access_token override")
@@ -74,6 +80,17 @@ def set_hide_unavailable_search_results(enabled: bool) -> bool:
         return False
     setattr(_config, "HideUnavailableSearchResults", bool(enabled))
     return hide_unavailable_search_results()
+
+
+def search_source_check_enabled() -> bool:
+    return bool(_get_config_value("EnableSearchSourceCheck", True))
+
+
+def set_search_source_check_enabled(enabled: bool) -> bool:
+    if _config is None:
+        return False
+    setattr(_config, "EnableSearchSourceCheck", bool(enabled))
+    return search_source_check_enabled()
 
 
 def _path_value(name: str, default: Path) -> Path:

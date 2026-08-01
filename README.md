@@ -48,6 +48,8 @@ config.qqmusic_refresh.RefreshKey = "..."
 
 `config.qqmusic_refresh.HideUnavailableSearchResults = True`（默认值）会静默隐藏前 5 个检测结果中确认没有音源的歌曲；设为 `False` 时仍会检测并缓存状态，但保留搜索结果。
 
+`config.qqmusic_refresh.EnableSearchSourceCheck = True`（默认值）控制是否执行搜索结果音源检测；设为 `False` 时完全跳过音源请求和隐藏逻辑。
+
 启动后会立即尝试一次，之后按 `IntervalHours` 重试。续期状态和模拟设备信息分别保存在：
 
 - `fuo_qqmusic_refresh.json`
@@ -67,7 +69,7 @@ config.qqmusic_refresh.RefreshKey = "..."
 
 右键菜单由本插件注入官方 QQ 音乐 provider UI，不需要修改 `fuo-qqmusic` 源码。更新插件后需要重启 FeelUOwn，才能让插件管理器重新加载入口。
 
-搜索结果会自动检查前 5 首歌曲的最低音质 MP3（`M500`）。每首歌曲最多请求一次，结果缓存 15 分钟；确认没有可用地址时会从搜索结果中静默隐藏。网络请求失败会保留歌曲，不会误判为歌曲没有版权。
+搜索结果会自动检查最低音质 MP3（`M500`）。开启隐藏时，会顺序检查结果，确认无音源就静默跳过，并继续检查后续歌曲，直到凑够前 5 首可用歌曲或结果耗尽。每首歌曲最多请求一次，结果缓存 15 分钟；网络请求失败会保留歌曲，不会误判为歌曲没有版权。关闭隐藏时只检测原始前 5 首并保留全部结果。
 
 全新网页登录时，插件会自动保留登录窗口一小段时间，收集登录后延迟写入的完整 Cookie；如果网页跳转包含 QQ 音乐登录回调 code，还会在本机交换登录响应，并合并 `psrf_qqrefresh_token` 或 `refresh_key`（如果 QQ 音乐服务器返回）。这些字段不会输出到日志，也不会发送到第三方服务。
 
