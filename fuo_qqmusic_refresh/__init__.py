@@ -27,7 +27,7 @@ from .storage import (
 
 __alias__ = "QQ 音乐 Cookie 自动续期"
 __feeluown_version__ = "1.1.0"
-__version__ = "0.1.7"
+__version__ = "0.1.9"
 __desc__ = "使用 QQ 音乐移动端登录接口自动续期现有 QQ 音乐登录态"
 __author__ = "Codex"
 
@@ -58,6 +58,18 @@ def init_config(config):
         bool,
         True,
         "Check QQ Music search results for a playable source",
+    )
+    config.deffield(
+        "JudgeBySearchFields",
+        bool,
+        True,
+        "Judge playability from search response fields before probing URLs",
+    )
+    config.deffield(
+        "AccountIsVip",
+        bool,
+        False,
+        "Treat VIP-only QQ Music songs as playable without probing URLs",
     )
     config.deffield("RefreshKey", str, "", "Optional refresh_key override")
     config.deffield("OpenID", str, "", "Optional openid override")
@@ -91,6 +103,28 @@ def set_search_source_check_enabled(enabled: bool) -> bool:
         return False
     setattr(_config, "EnableSearchSourceCheck", bool(enabled))
     return search_source_check_enabled()
+
+
+def judge_by_search_fields() -> bool:
+    return bool(_get_config_value("JudgeBySearchFields", True))
+
+
+def set_judge_by_search_fields(enabled: bool) -> bool:
+    if _config is None:
+        return False
+    setattr(_config, "JudgeBySearchFields", bool(enabled))
+    return judge_by_search_fields()
+
+
+def account_is_vip() -> bool:
+    return bool(_get_config_value("AccountIsVip", False))
+
+
+def set_account_is_vip(enabled: bool) -> bool:
+    if _config is None:
+        return False
+    setattr(_config, "AccountIsVip", bool(enabled))
+    return account_is_vip()
 
 
 def _path_value(name: str, default: Path) -> Path:

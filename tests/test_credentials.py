@@ -237,6 +237,8 @@ class CredentialTests(unittest.TestCase):
                 "全新网页登录并获取刷新凭据",
                 "隐藏无音源搜索结果",
                 "启用音源检测",
+                "用搜索字段直接判定音源",
+                "我是 VIP 账号（免检测 VIP 歌）",
             ],
         )
         self.assertTrue(install_qqmusic_ui(app))

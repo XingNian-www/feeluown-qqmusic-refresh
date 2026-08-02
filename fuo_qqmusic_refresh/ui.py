@@ -86,6 +86,22 @@ class _CookieMenuController:
 
             check_source_action.setChecked(search_source_check_enabled())
         check_source_action.triggered.connect(self.toggle_source_check)
+        field_judge_action = menu.addAction("用搜索字段直接判定音源")
+        if hasattr(field_judge_action, "setCheckable"):
+            field_judge_action.setCheckable(True)
+        if hasattr(field_judge_action, "setChecked"):
+            from . import judge_by_search_fields
+
+            field_judge_action.setChecked(judge_by_search_fields())
+        field_judge_action.triggered.connect(self.toggle_field_judgment)
+        vip_action = menu.addAction("我是 VIP 账号（免检测 VIP 歌）")
+        if hasattr(vip_action, "setCheckable"):
+            vip_action.setCheckable(True)
+        if hasattr(vip_action, "setChecked"):
+            from . import account_is_vip
+
+            vip_action.setChecked(account_is_vip())
+        vip_action.triggered.connect(self.toggle_account_vip)
 
     def toggle_hide_unavailable(self, checked: bool = True) -> None:
         from . import set_hide_unavailable_search_results
@@ -96,6 +112,16 @@ class _CookieMenuController:
         from . import set_search_source_check_enabled
 
         set_search_source_check_enabled(bool(checked))
+
+    def toggle_field_judgment(self, checked: bool = True) -> None:
+        from . import set_judge_by_search_fields
+
+        set_judge_by_search_fields(bool(checked))
+
+    def toggle_account_vip(self, checked: bool = True) -> None:
+        from . import set_account_is_vip
+
+        set_account_is_vip(bool(checked))
 
     def fresh_login(self) -> None:
         relogin = getattr(self.provider_ui, "_re_login", None)

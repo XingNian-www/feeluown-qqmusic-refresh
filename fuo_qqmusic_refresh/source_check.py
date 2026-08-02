@@ -17,6 +17,11 @@ _CACHE_KEY = "qqmusic_source_available"
 _cache: dict[tuple[str, str, str], tuple[float, bool]] = {}
 _cache_lock = threading.Lock()
 
+RAW_META_TTL_SECONDS = SOURCE_CHECK_TTL_SECONDS
+RAW_META_MAX_ENTRIES = 512
+_raw_meta: dict[str, tuple[float, dict]] = {}
+_raw_meta_lock = threading.Lock()
+
 
 def _api_cache_identity(provider: Any) -> tuple[str, str]:
     api = getattr(provider, "api", None)
@@ -68,6 +73,112 @@ def _hide_unavailable_search_results() -> bool:
         return True
 
 
+def _field_judgment_enabled() -> bool:
+    try:
+        from . import judge_by_search_fields
+
+        return judge_by_search_fields()
+    except Exception:
+        return True
+
+
+def _account_is_vip() -> bool:
+    try:
+        from . import account_is_vip
+
+        return account_is_vip()
+    except Exception:
+        return False
+
+
+def _stash_raw_songs(songs: Any) -> None:
+    """Keep the raw search response items so playability fields stay reachable.
+
+    ``fuo_qqmusic`` deserializes search results with marshmallow ``EXCLUDE``,
+    which drops ``action``/``pay``/``status`` from the song models. Stashing
+    the raw dicts keyed by song id lets the source check read them afterwards.
+    """
+    if not isinstance(songs, list):
+        return
+    expires = time.monotonic() + RAW_META_TTL_SECONDS
+    with _raw_meta_lock:
+        for item in songs:
+            if not isinstance(item, dict):
+                continue
+            identifier = item.get("id")
+            if identifier is None:
+                continue
+            _raw_meta[str(identifier)] = (expires, item)
+        if len(_raw_meta) > RAW_META_MAX_ENTRIES:
+            now = time.monotonic()
+            expired = [k for k, (exp, _) in _raw_meta.items() if exp <= now]
+            for expired_key in expired:
+                _raw_meta.pop(expired_key, None)
+
+
+def _raw_meta_for(song: Any) -> dict | None:
+    identifier = str(getattr(song, "identifier", "") or "")
+    if not identifier:
+        return None
+    now = time.monotonic()
+    with _raw_meta_lock:
+        entry = _raw_meta.get(identifier)
+        if entry is None:
+            return None
+        expires, item = entry
+        if expires <= now:
+            del _raw_meta[identifier]
+            return None
+        return item
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _judge_from_raw(item: dict) -> bool | None:
+    """Judge playability from the raw search response fields.
+
+    Returns ``True``/``False`` when the fields give a definitive answer and
+    ``None`` when the account-specific URL probe is still needed:
+
+    - ``action.switch`` play bit off -> unavailable for every account; this is
+      the same bit the QQ Music web client uses to grey out search results.
+    - ``pay.pay_play == 1`` -> VIP-gated: available directly when the user
+      declared a VIP account, otherwise the caller should fall back to the
+      account-specific URL probe.
+    - all ``file.size_*`` values zero -> no audio files exist at all.
+    """
+    action = item.get("action")
+    switch = _int_or_none(action.get("switch")) if isinstance(action, dict) else None
+    if switch is not None and (switch & 1) == 0:
+        return False
+
+    pay = item.get("pay")
+    pay_play = _int_or_none(pay.get("pay_play")) if isinstance(pay, dict) else None
+    if pay_play == 1:
+        return True if _account_is_vip() else None
+
+    if switch is not None:
+        return True
+
+    files = item.get("file")
+    if isinstance(files, dict) and files:
+        sizes = [
+            value
+            for key, value in files.items()
+            if key.startswith("size_")
+            and key != "size_try"
+            and isinstance(value, (int, float))
+        ]
+        if sizes and all(value <= 0 for value in sizes):
+            return False
+    return None
+
+
 def _cached_source(provider: Any, song: Any) -> bool | None:
     uin, token = _api_cache_identity(provider)
     identifier = str(getattr(song, "identifier", "") or "")
@@ -96,15 +207,31 @@ def _cache_source(provider: Any, song: Any, available: bool) -> None:
 
 
 def check_song_source(provider: Any, song: Any) -> bool | None:
-    """Check one song with QQ Music's lowest MP3 quality.
+    """Check one song, preferring search response fields over a URL probe.
 
-    ``None`` means the request could not be completed and is deliberately
-    treated as unknown rather than as an unavailable song.
+    Judgment order: in-memory result cache -> raw search fields
+    (``action.switch``/``pay.pay_play``/``file.size_*``) -> request the lowest
+    MP3 quality URL. ``None`` means the answer could not be determined and is
+    deliberately treated as unknown rather than as an unavailable song.
     """
     cached = _cached_source(provider, song)
     if cached is not None:
         _set_song_source_state(song, cached)
         return cached
+
+    if _field_judgment_enabled():
+        raw = _raw_meta_for(song)
+        if raw is not None:
+            verdict = _judge_from_raw(raw)
+            if verdict is not None:
+                logger.debug(
+                    "QQ Music source judged from search fields: song=%s available=%s",
+                    getattr(song, "identifier", ""),
+                    verdict,
+                )
+                _cache_source(provider, song, verdict)
+                _set_song_source_state(song, verdict)
+                return verdict
 
     mid, media_id = _song_identifiers(song)
     api = getattr(provider, "api", None)
@@ -182,6 +309,49 @@ def _is_song_search(kwargs: dict[str, Any]) -> bool:
     return value in ("song", "so", 0)
 
 
+def _install_api_meta_capture(provider: Any) -> bool:
+    """Wrap ``api.search`` to stash raw song fields before deserialization."""
+    api = getattr(provider, "api", None)
+    if api is None:
+        return False
+    if getattr(api, "_qqmusic_refresh_meta_capture", None) is not None:
+        return True
+    original = getattr(api, "search", None)
+    if original is None:
+        return False
+
+    @functools.wraps(original)
+    def search_with_meta_capture(*args, **kwargs):
+        result = original(*args, **kwargs)
+        type_ = kwargs.get("type_", args[1] if len(args) > 1 else 0)
+        if type_ == 0:
+            try:
+                _stash_raw_songs(result)
+            except Exception:
+                logger.debug("Failed to stash QQ Music search metadata", exc_info=True)
+        return result
+
+    api.search = search_with_meta_capture
+    api._qqmusic_refresh_meta_capture = True
+    api._qqmusic_refresh_original_api_search = original
+    return True
+
+
+def _uninstall_api_meta_capture(provider: Any) -> None:
+    api = getattr(provider, "api", None)
+    if api is None:
+        return
+    original = getattr(api, "_qqmusic_refresh_original_api_search", None)
+    if original is not None:
+        api.search = original
+    for name in (
+        "_qqmusic_refresh_meta_capture",
+        "_qqmusic_refresh_original_api_search",
+    ):
+        if hasattr(api, name):
+            delattr(api, name)
+
+
 def install_source_check() -> bool:
     """Wrap the official provider search without modifying its source package."""
     try:
@@ -196,6 +366,8 @@ def install_source_check() -> bool:
     original = getattr(provider, "search", None)
     if original is None:
         return False
+
+    _install_api_meta_capture(provider)
 
     @functools.wraps(original)
     def search_with_source_check(*args, **kwargs):
@@ -216,6 +388,7 @@ def uninstall_source_check() -> None:
     except Exception:
         return
 
+    _uninstall_api_meta_capture(provider)
     original = getattr(provider, "_qqmusic_refresh_original_search", None)
     if original is not None:
         provider.search = original
