@@ -139,28 +139,46 @@ def _int_or_none(value: Any) -> int | None:
         return None
 
 
+# Bit layout of ``action.switch`` as decoded by the official QQ Music web
+# client: after dropping the lowest bit, the remaining bits map to
+# ["play_lq", "play_hq", "play_sq", "down_lq", ..., "try", "give"].
+# The web client greys out a song when ``action.play`` is 0, where
+# ``action.play = play_lq | play_hq | play_sq`` -> bits 1-3.
+PLAY_BITS_MASK = 0b1110
+# ``try`` (试听) is bit 14: only a short preview exists for non-VIP accounts.
+TRY_BIT_MASK = 1 << 14
+
+
 def _judge_from_raw(item: dict) -> bool | None:
     """Judge playability from the raw search response fields.
 
     Returns ``True``/``False`` when the fields give a definitive answer and
     ``None`` when the account-specific URL probe is still needed:
 
-    - ``action.switch`` play bit off -> unavailable for every account; this is
-      the same bit the QQ Music web client uses to grey out search results.
+    - ``action.switch`` play bits (1-3) all off and no ``try`` bit ->
+      unavailable for every account; this is the same condition the QQ Music
+      web client uses to grey out search results.
+    - play bits off but ``try`` bit set -> only a preview exists; whether the
+      full song plays depends on the account, so probe.
     - ``pay.pay_play == 1`` -> VIP-gated: available directly when the user
-      declared a VIP account, otherwise the caller should fall back to the
-      account-specific URL probe.
+      declared a VIP account, otherwise probe.
     - all ``file.size_*`` values zero -> no audio files exist at all.
     """
     action = item.get("action")
     switch = _int_or_none(action.get("switch")) if isinstance(action, dict) else None
-    if switch is not None and (switch & 1) == 0:
+    play_bits_off = switch is not None and (switch & PLAY_BITS_MASK) == 0
+    if play_bits_off and (switch & TRY_BIT_MASK) == 0:
         return False
 
     pay = item.get("pay")
     pay_play = _int_or_none(pay.get("pay_play")) if isinstance(pay, dict) else None
     if pay_play == 1:
         return True if _account_is_vip() else None
+
+    if play_bits_off:
+        # Only the ``try`` preview bit is set; full playback depends on the
+        # account, so let the URL probe decide.
+        return None
 
     if switch is not None:
         return True

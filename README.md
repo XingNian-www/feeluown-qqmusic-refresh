@@ -50,9 +50,9 @@ config.qqmusic_refresh.RefreshKey = "..."
 
 `config.qqmusic_refresh.EnableSearchSourceCheck = True`（默认值）控制是否执行搜索结果音源检测；设为 `False` 时完全跳过音源请求和隐藏逻辑。
 
-`config.qqmusic_refresh.JudgeBySearchFields = True`（默认值）控制是否优先用搜索响应自带的 `action.switch` / `pay.pay_play` / `file.size_*` 字段判定音源。播放开关位为 0（与网页端置灰一致）直接判无音源，免费可播歌曲直接判可用，这两类都不再发起额外请求；仅 VIP 歌曲（`pay_play = 1`）回退到按账号精确判定的 URL 探测。设为 `False` 时恢复对所有被检歌曲逐一请求播放地址。
+`config.qqmusic_refresh.JudgeBySearchFields = True`（默认值）控制是否优先用搜索响应自带的 `action.switch` / `pay.pay_play` / `file.size_*` 字段判定音源。判定规则与网页端一致：`action.switch` 的第 1-3 位（`play_lq`/`play_hq`/`play_sq`，网页端据此计算 `action.play`，全 0 时置灰）全为 0 且没有试听位（第 14 位 `try`）时直接判无音源，免费可播歌曲直接判可用，这两类都不再发起额外请求；仅 VIP 歌曲（`pay_play = 1`）和只有试听位的歌曲回退到按账号精确判定的 URL 探测。设为 `False` 时恢复对所有被检歌曲逐一请求播放地址。
 
-`config.qqmusic_refresh.AccountIsVip = False`（默认值）。当前账号是 QQ 音乐 VIP 时设为 `True`，VIP 歌曲（`pay_play = 1`）会直接判定为可播，不再发起 URL 探测。注意播放开关位为 0 的歌曲是平台级无版权，VIP 账号同样无法播放，仍会被判定为无音源。
+`config.qqmusic_refresh.AccountIsVip = False`（默认值）。当前账号是 QQ 音乐 VIP 时设为 `True`，VIP 歌曲（`pay_play = 1`）会直接判定为可播，不再发起 URL 探测。注意播放位全 0 且无试听位的歌曲是平台级无版权，VIP 账号同样无法播放，仍会被判定为无音源。
 
 启动后会立即尝试一次，之后按 `IntervalHours` 重试。续期状态和模拟设备信息分别保存在：
 
@@ -73,7 +73,7 @@ config.qqmusic_refresh.RefreshKey = "..."
 
 右键菜单由本插件注入官方 QQ 音乐 provider UI，不需要修改 `fuo-qqmusic` 源码。更新插件后需要重启 FeelUOwn，才能让插件管理器重新加载入口。
 
-搜索结果会先做音源检测。插件会在搜索响应反序列化前暂存每首歌的原始字段（`action` 的播放开关位与网页端置灰逻辑一致、`pay.pay_play` 标记 VIP 歌曲、`file.size_*` 标记音频文件是否存在），能直接判定的歌曲不再发起请求；只有 VIP 歌曲等字段无法按账号确定的歌曲，才检查最低音质 MP3（`M500`）的播放地址。开启隐藏时，会顺序检查结果，确认无音源就静默跳过，并继续检查后续歌曲，直到凑够前 5 首可用歌曲或结果耗尽。每首歌曲最多请求一次，结果缓存 15 分钟；网络请求失败会保留歌曲，不会误判为歌曲没有版权。关闭隐藏时只检测原始前 5 首并保留全部结果。
+搜索结果会先做音源检测。插件会在搜索响应反序列化前暂存每首歌的原始字段（`action.switch` 的播放位与试听位，判定规则与网页端置灰逻辑一致、`pay.pay_play` 标记 VIP 歌曲、`file.size_*` 标记音频文件是否存在），能直接判定的歌曲不再发起请求；只有 VIP 歌曲等字段无法按账号确定的歌曲，才检查最低音质 MP3（`M500`）的播放地址。开启隐藏时，会顺序检查结果，确认无音源就静默跳过，并继续检查后续歌曲，直到凑够前 5 首可用歌曲或结果耗尽。每首歌曲最多请求一次，结果缓存 15 分钟；网络请求失败会保留歌曲，不会误判为歌曲没有版权。关闭隐藏时只检测原始前 5 首并保留全部结果。
 
 全新网页登录时，插件会自动保留登录窗口一小段时间，收集登录后延迟写入的完整 Cookie；如果网页跳转包含 QQ 音乐登录回调 code，还会在本机交换登录响应，并合并 `psrf_qqrefresh_token` 或 `refresh_key`（如果 QQ 音乐服务器返回）。这些字段不会输出到日志，也不会发送到第三方服务。
 

@@ -43,27 +43,34 @@ def make_provider(get_song_url_v2=None):
 
 
 class JudgeFromRawTests(unittest.TestCase):
-    def test_play_switch_off_means_unavailable(self):
-        # 16889602 = 16889603 & ~1：播放位为 0，与网页端置灰一致
-        item = {"action": {"switch": 16889602}, "pay": {"pay_play": 0}}
+    # 真实数据：芊芊 - 西瓜JUN/排骨教主（无音源）switch=65537
+    # 真实数据：芊芊 - 排骨教主（VIP/有试听）switch=16897793
+    # 真实数据：免费可播歌曲 switch=16889603
+    def test_play_bits_off_and_no_try_means_unavailable(self):
+        item = {"action": {"switch": 65537}, "pay": {"pay_play": 0}}
         self.assertIs(_judge_from_raw(item), False)
 
-    def test_free_song_with_play_switch_on_means_available(self):
+    def test_play_bits_off_with_try_bit_falls_back_to_probe(self):
+        # 播放位全 0 但有试听位：全曲能否播放取决于账号，交给 URL 探测
+        item = {"action": {"switch": 65537 | (1 << 14)}, "pay": {"pay_play": 0}}
+        self.assertIsNone(_judge_from_raw(item))
+
+    def test_free_song_with_play_bits_on_means_available(self):
         item = {"action": {"switch": 16889603}, "pay": {"pay_play": 0}}
         self.assertIs(_judge_from_raw(item), True)
 
     def test_vip_song_falls_back_to_probe(self):
-        item = {"action": {"switch": 16889603}, "pay": {"pay_play": 1}}
+        item = {"action": {"switch": 16897793}, "pay": {"pay_play": 1}}
         self.assertIsNone(_judge_from_raw(item))
 
     def test_vip_song_is_available_for_vip_account(self):
-        item = {"action": {"switch": 16889603}, "pay": {"pay_play": 1}}
+        item = {"action": {"switch": 16897793}, "pay": {"pay_play": 1}}
         with mock.patch("fuo_qqmusic_refresh.account_is_vip", return_value=True):
             self.assertIs(_judge_from_raw(item), True)
 
-    def test_vip_account_does_not_excuse_play_switch_off(self):
-        # 播放开关位为 0 是平台级无版权，VIP 也播不了
-        item = {"action": {"switch": 16889602}, "pay": {"pay_play": 1}}
+    def test_vip_account_does_not_excuse_missing_play_bits(self):
+        # 播放位全 0 且无试听位是平台级无版权，VIP 也播不了
+        item = {"action": {"switch": 65537}, "pay": {"pay_play": 1}}
         with mock.patch("fuo_qqmusic_refresh.account_is_vip", return_value=True):
             self.assertIs(_judge_from_raw(item), False)
 
@@ -126,7 +133,7 @@ class CheckSongSourceTests(unittest.TestCase):
     def test_no_source_song_is_judged_without_probing(self):
         provider = make_provider()
         song = FakeSong("1", mid="m1", media_id="md1")
-        self.seed_raw("1", {"action": {"switch": 16889602}, "pay": {"pay_play": 0}})
+        self.seed_raw("1", {"action": {"switch": 65537}, "pay": {"pay_play": 0}})
         self.assertIs(check_song_source(provider, song), False)
         provider.api.get_song_url_v2.assert_not_called()
 
@@ -155,7 +162,7 @@ class CheckSongSourceTests(unittest.TestCase):
     def test_field_judgment_disabled_uses_probe(self):
         provider = make_provider()
         song = FakeSong("4", mid="m4", media_id="md4")
-        self.seed_raw("4", {"action": {"switch": 16889602}, "pay": {"pay_play": 0}})
+        self.seed_raw("4", {"action": {"switch": 65537}, "pay": {"pay_play": 0}})
         with mock.patch(
             "fuo_qqmusic_refresh.judge_by_search_fields", return_value=False
         ):
@@ -218,7 +225,7 @@ class InstallCaptureTests(unittest.TestCase):
 
     def test_end_to_end_hides_no_source_without_probing(self):
         raw = [
-            {"id": 1, "action": {"switch": 16889602}, "pay": {"pay_play": 0}},
+            {"id": 1, "action": {"switch": 65537}, "pay": {"pay_play": 0}},
             {"id": 2, "action": {"switch": 16889603}, "pay": {"pay_play": 0}},
         ]
         songs = [FakeSong("1", mid="m1", media_id="md1"),
